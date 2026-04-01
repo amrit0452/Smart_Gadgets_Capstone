@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Neo Gadgets - Login</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <span>Neo Gadgets</span>
+        </div>
+        <div class="nav">
+          <a href="./Home.html">Home</a>
+          <a href="./Cart.html">Cart</a>
+          <a href="./Orders.html">Orders</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <h1 style="margin:0 0 10px;">Login</h1>
+      <p class="muted" style="margin-top:0;">Welcome back. Enter your credentials.</p>
+
+      <div class="card" style="max-width:520px;">
+        <form id="loginForm" class="form">
+          <div>
+            <label>Email</label>
+            <input id="email" type="email" placeholder="you@example.com" required />
+          </div>
+          <div>
+            <label>Password</label>
+            <input id="password" type="password" placeholder="Your password" required minlength="8" />
+          </div>
+
+          <div id="msg" style="display:none;"></div>
+
+          <button type="submit">Login</button>
+
+          <div class="row" style="justify-content:space-between;margin-top:6px;">
+            <a class="muted" href="./Register.html">Create account</a>
+            <a class="muted" href="#" onclick="forgotPassword()">Forgot password?</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/ui.js"></script>
+    <script>
+      function setErr(text) {
+        const el = $("msg");
+        setMessage(el, "error", text);
+      }
+
+      async function forgotPassword() {
+        const email = $("email").value.trim();
+        if (!email) return setErr("Enter your email first.");
+
+        try {
+          $("msg").style.display = "none";
+          const res = await apiFetch(`/auth/forgot`, {
+            method: "POST",
+            body: JSON.stringify({ email }),
+          });
+          setMessage($("msg"), "success", res.message || "Check your email for reset instructions.");
+        } catch (e) {
+          setErr(e.message || "Failed to request reset.");
+        }
+      }
+
+      const form = document.getElementById("loginForm");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = $("email").value.trim();
+        const password = $("password").value;
+
+        if (!email || !password) return setErr("Email and password are required.");
+
+        try {
+          $("msg").style.display = "none";
+          const res = await apiFetch(`/auth/login`, {
+            method: "POST",
+            body: JSON.stringify({ email, password }),
+          });
+
+          window.localStorage.setItem("token", res.token);
+          window.location.href = "./Home.html";
+        } catch (err) {
+          setErr(err.message || "Login failed.");
+        }
+      });
+    </script>
+  </body>
+</html>
+

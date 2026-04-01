@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Neo Gadgets - Orders</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand"><span>Neo Gadgets</span></div>
+        <div class="nav">
+          <a href="./Home.html">Home</a>
+          <a href="./Cart.html">Cart</a>
+          <a href="./Orders.html">Orders</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:18px;">
+      <div id="msgBox" class="card" style="display:none;"></div>
+      <h1 style="margin:0 0 10px;font-size:22px;">Your Orders</h1>
+
+      <div class="grid two" style="align-items:start;">
+        <div class="card">
+          <h2 style="margin:0 0 12px;font-size:16px;">Order History</h2>
+          <div id="ordersList" class="grid" style="grid-template-columns:1fr;gap:12px;"></div>
+        </div>
+
+        <div class="card">
+          <h2 style="margin:0 0 12px;font-size:16px;">Order Details</h2>
+          <div id="orderDetail" class="muted">Select an order to view details.</div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/ui.js"></script>
+    <script>
+      function setMsg(text, kind) {
+        const el = $("msgBox");
+        el.style.display = text ? "block" : "none";
+        el.className = kind === "success" ? "success" : kind === "error" ? "error" : "card";
+        el.textContent = text || "";
+      }
+      function money(n) { return `₹${Number(n).toFixed(2)}`; }
+
+      let orders = [];
+
+      async function loadOrders() {
+        const token = window.localStorage.getItem("token");
+        if (!token) return (window.location.href = "./Login.html");
+
+        setMsg("", "");
+        try {
+          const res = await apiFetch(`/orders`, { method: "GET", requireAuth: true });
+          orders = res.orders || [];
+          const list = $("ordersList");
+          if (!orders.length) {
+            list.innerHTML = `<div class="muted" style="font-weight:800;">No orders yet.</div>`;
+            $("orderDetail").textContent = "Select an order to view details.";
+            return;
+          }
+
+          list.innerHTML = orders
+            .map((o) => {
+              return `
+                <div class="card" style="padding:12px;cursor:pointer;" onclick="selectOrder(${o.order_id})">
+                  <div class="row" style="justify-content:space-between;">
+                    <div style="font-weight:900;">Order #${o.order_id}</div>
+                    <span class="badge">${o.order_status}</span>
+                  </div>
+                  <div class="muted" style="margin-top:6px;font-size:13px;">Payment: ${o.payment_status}</div>
+                  <div style="margin-top:8px;font-weight:900;">${money(o.total)}</div>
+                </div>
+              `;
+            })
+            .join("");
+        } catch (e) {
+          setMsg(e.message || "Failed to load orders.", "error");
+        }
+      }
+
+      async function selectOrder(orderId) {
+        try {
+          const res = await apiFetch(`/orders/${orderId}`, { method: "GET", requireAuth: true });
+          const o = res.order;
+          const detail = $("orderDetail");
+
+          const itemsHtml = (o.items || [])
+            .map((it) => `<div class="row" style="justify-content:space-between;"><div>${it.product_name} x ${it.quantity}</div><div>${money(it.unit_price * it.quantity)}</div></div>`)
+            .join("");
+
+          const canCancel = o.order_status === "CREATED";
+          const canReturn = o.order_status === "DELIVERED";
+
+          detail.innerHTML = `
+            <div class="muted" style="margin-bottom:8px;">Order #${o.order_id}</div>
+            ${itemsHtml || "<div class='muted'>No items</div>"}
+            <div class="row" style="justify-content:space-between;margin-top:10px;">
+              <div class="muted" style="font-weight:800;">Total</div>
+              <div style="font-weight:900;">${money(o.total)}</div>
+            </div>
+            <div class="row" style="justify-content:flex-end;margin-top:12px;">
+              <button type="button" class="secondary" style="background:#fff;border:1px solid var(--border);color:var(--text);display:${canCancel ? 'inline-block' : 'none'};" onclick="cancelOrder(${o.order_id})">Cancel</button>
+              <button type="button" class="secondary danger" style="margin-left:8px;background:#fff;border:1px solid rgba(220,38,38,.25);color:var(--danger);display:${canReturn ? 'inline-block' : 'none'};" onclick="returnOrder(${o.order_id})">Return</button>
+            </div>
+            <div class="muted" style="margin-top:8px;font-size:13px;">Status: ${o.order_status} · Payment: ${o.payment_status}</div>
+          `;
+        } catch (e) {
+          setMsg(e.message || "Failed to load order details.", "error");
+        }
+      }
+
+      async function cancelOrder(orderId) {
+        try {
+          setMsg("", "");
+          await apiFetch(`/orders/${orderId}/cancel`, { method: "POST", requireAuth: true });
+          setMsg("Order cancelled. Stock restored and refund simulated.", "success");
+          await loadOrders();
+          $("orderDetail").textContent = "Select an order to view details.";
+        } catch (e) {
+          setMsg(e.message || "Cancel failed.", "error");
+        }
+      }
+
+      async function returnOrder(orderId) {
+        try {
+          setMsg("", "");
+          await apiFetch(`/orders/${orderId}/return`, { method: "POST", requireAuth: true });
+          setMsg("Return processed. Refund simulated.", "success");
+          await loadOrders();
+          $("orderDetail").textContent = "Select an order to view details.";
+        } catch (e) {
+          setMsg(e.message || "Return failed.", "error");
+        }
+      }
+
+      loadOrders();
+    </script>
+  </body>
+</html>
+

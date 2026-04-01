@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Neo Gadgets - Cart</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand"><span>Neo Gadgets</span></div>
+        <div class="nav">
+          <a href="./Home.html">Home</a>
+          <a href="./Cart.html">Cart</a>
+          <a href="./Orders.html">Orders</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:18px;">
+      <div id="msgBox" class="card" style="display:none;"></div>
+
+      <h1 style="margin:0 0 10px;font-size:22px;">Your Cart</h1>
+
+      <div class="card">
+        <div id="cartEmpty" class="muted" style="display:none;font-weight:800;">Your cart is empty.</div>
+        <div id="cartTableWrap" style="overflow:auto;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Price</th>
+                <th>Qty</th>
+                <th>Stock</th>
+                <th>Line Total</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="cartTbody"></tbody>
+          </table>
+        </div>
+
+        <div class="row" style="justify-content:space-between;margin-top:16px;">
+          <div class="muted" style="font-weight:800;">Subtotal</div>
+          <div id="subtotal" style="font-weight:900;font-size:18px;">₹0.00</div>
+        </div>
+
+        <div class="row" style="margin-top:14px;justify-content:flex-end;">
+          <a id="checkoutLink" class="secondary" href="./Checkout.html" style="background:#fff;border:1px solid var(--border);padding:10px 14px;border-radius:10px;pointer-events:none;opacity:.6;">Proceed to Checkout</a>
+        </div>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/ui.js"></script>
+    <script>
+      function setMsg(text, kind) {
+        const el = $("msgBox");
+        el.style.display = text ? "block" : "none";
+        el.className = kind === "success" ? "success" : kind === "error" ? "error" : "card";
+        el.textContent = text || "";
+      }
+
+      function money(n) {
+        return `₹${Number(n).toFixed(2)}`;
+      }
+
+      let cartItems = [];
+
+      async function loadCart() {
+        setMsg("", "");
+        const token = window.localStorage.getItem("token");
+        if (!token) {
+          window.location.href = "./Login.html";
+          return;
+        }
+
+        try {
+          const res = await apiFetch(`/cart/summary`, { method: "GET", requireAuth: true });
+          cartItems = res.items || [];
+          const empty = cartItems.length === 0;
+          $("cartEmpty").style.display = empty ? "block" : "none";
+          $("cartTableWrap").style.display = empty ? "none" : "block";
+          $("checkoutLink").style.pointerEvents = empty ? "none" : "auto";
+          $("checkoutLink").style.opacity = empty ? ".6" : "1";
+
+          $("cartTbody").innerHTML = cartItems
+            .map((it) => {
+              const inStock = it.isAvailable === 1 && Number(it.stockQuantity) >= Number(it.quantity);
+              return `
+                <tr>
+                  <td>
+                    <div style="font-weight:900;">${it.name}</div>
+                    <div class="muted" style="font-size:13px;">${it.brand}</div>
+                  </td>
+                  <td>${money(it.unitPrice)}</td>
+                  <td>
+                    <input id="qty_${it.productId}" type="number" min="0" value="${it.quantity}" step="1" style="width:90px;" />
+                  </td>
+                  <td>${inStock ? `In stock (${it.stockQuantity})` : `Low/Out (${it.stockQuantity})`}</td>
+                  <td>${money(it.lineTotal)}</td>
+                  <td>
+                    <button type="button" class="secondary" style="background:#fff;border:1px solid var(--border);color:var(--text);" onclick="updateQty(${it.productId})">Update</button>
+                    <button type="button" class="danger" style="margin-left:8px;background:#fff;border:1px solid rgba(220,38,38,.25);color:var(--danger);" onclick="removeItem(${it.productId})">Remove</button>
+                  </td>
+                </tr>
+              `;
+            })
+            .join("");
+
+          $("subtotal").textContent = money(res.subtotal);
+        } catch (e) {
+          setMsg(e.message || "Failed to load cart.", "error");
+        }
+      }
+
+      async function updateQty(productId) {
+        const qtyEl = document.getElementById(`qty_${productId}`);
+        const qty = Number(qtyEl.value);
+        try {
+          await apiFetch(`/cart/items/${productId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ quantity: qty }),
+            requireAuth: true,
+          });
+          await loadCart();
+        } catch (e) {
+          setMsg(e.message || "Quantity update failed.", "error");
+          await loadCart();
+        }
+      }
+
+      async function removeItem(productId) {
+        try {
+          await apiFetch(`/cart/items/${productId}`, { method: "DELETE", requireAuth: true });
+          await loadCart();
+        } catch (e) {
+          setMsg(e.message || "Remove failed.", "error");
+        }
+      }
+
+      $("checkoutLink").onclick = async () => {
+        // Validate cart not empty before navigating.
+        if (!cartItems.length) {
+          setMsg("Cart is empty.", "error");
+        }
+      };
+
+      loadCart();
+    </script>
+  </body>
+</html>
+

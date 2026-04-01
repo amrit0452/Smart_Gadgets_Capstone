@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Neo Gadgets - Product</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand"><span>Neo Gadgets</span></div>
+        <div class="nav">
+          <a href="./Home.html">Home</a>
+          <a href="./Cart.html">Cart</a>
+          <a href="./Orders.html">Orders</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:18px;">
+      <div id="errorBox" class="card" style="display:none;"></div>
+
+      <div class="grid two" id="productLayout" style="align-items:start;">
+        <div class="card">
+          <div class="row" style="gap:12px;align-items:flex-start;flex-wrap:wrap;">
+            <div style="flex:1;min-width:260px;">
+              <img id="mainImage" class="img" src="" alt="" style="height:340px;width:100%;border-radius:14px;object-fit:cover;background:#f3f4f6;" />
+            </div>
+            <div style="width:120px;">
+              <div id="thumbs" class="grid" style="grid-template-columns:1fr;gap:10px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h1 id="productTitle" style="margin:0 0 8px;font-size:22px;"></h1>
+          <div class="row" style="justify-content:space-between;">
+            <div id="price" class="price" style="font-size:20px;"></div>
+            <span id="ratingBadge" class="badge">0★</span>
+          </div>
+          <div id="stockInfo" class="muted" style="margin-top:6px;font-weight:700;"></div>
+          <div id="categoryLine" class="muted" style="margin-top:6px;"></div>
+
+          <p id="description" style="margin-top:14px;line-height:1.6;"></p>
+
+          <div class="row" style="margin-top:14px;">
+            <div style="flex:1;min-width:220px;">
+              <label>Quantity</label>
+              <input id="qty" type="number" min="1" value="1" step="1" />
+              <div id="qtyErr" style="display:none;margin-top:8px;" class="error"></div>
+            </div>
+            <div style="align-self:end;">
+              <button id="addToCartBtn" type="button">Add to cart</button>
+            </div>
+          </div>
+
+          <div id="cartMsg" style="margin-top:10px;display:none;"></div>
+
+          <div style="margin-top:18px;">
+            <a class="secondary" href="./Cart.html" style="display:inline-block;background:#fff;border:1px solid var(--border);">Go to Cart</a>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:18px;" class="grid two">
+        <div class="card">
+          <h2 style="margin:0 0 10px;font-size:16px;">Reviews</h2>
+          <div id="reviewsMeta" class="muted" style="margin-bottom:10px;font-weight:700;"></div>
+          <div id="reviewsList" class="grid" style="grid-template-columns:1fr;gap:10px;"></div>
+        </div>
+
+        <div class="card">
+          <h2 style="margin:0 0 10px;font-size:16px;">Write a review</h2>
+          <form id="reviewForm" class="form">
+            <div>
+              <label>Rating (1-5)</label>
+              <select id="rating">
+                <option value="5">5 - Excellent</option>
+                <option value="4">4 - Good</option>
+                <option value="3">3 - Okay</option>
+                <option value="2">2 - Poor</option>
+                <option value="1">1 - Terrible</option>
+              </select>
+            </div>
+            <div>
+              <label>Review</label>
+              <textarea id="reviewText" rows="4" placeholder="Share your experience..." style="resize:vertical;"></textarea>
+            </div>
+            <div id="reviewModeLine" class="muted" style="font-weight:700;"></div>
+            <div class="row" style="justify-content:space-between;">
+              <button id="submitReviewBtn" type="submit">Submit</button>
+              <button type="button" class="secondary" id="cancelEditBtn" style="display:none;" onclick="cancelEdit()">Cancel edit</button>
+            </div>
+          </form>
+          <div id="reviewMsg" style="margin-top:10px;display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/ui.js"></script>
+    <script>
+      function decodeToken(token) {
+        try {
+          const payload = token.split(".")[1];
+          const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+          return JSON.parse(json);
+        } catch {
+          return null;
+        }
+      }
+
+      const productId = new URL(window.location.href).searchParams.get("id");
+      let editing = false;
+      let editReviewText = "";
+
+      function setBox(el, kind, text) {
+        el.style.display = text ? "block" : "none";
+        el.className = kind === "success" ? "success" : kind === "error" ? "error" : "";
+        el.textContent = text || "";
+      }
+
+      async function loadProduct() {
+        try {
+          const res = await apiFetch(`/products/${productId}`, { method: "GET" });
+          const p = res.product;
+
+          $("productTitle").textContent = p.name;
+          $("price").textContent = `₹${Number(p.price).toFixed(2)}`;
+          const ratingAvg = Number(p.rating_avg || 0);
+          $("ratingBadge").textContent = `${ratingAvg.toFixed(1)}★`;
+          const stockQty = Number(p.stock_quantity || 0);
+          const inStock = p.is_available === 1 && stockQty > 0;
+          $("stockInfo").textContent = inStock ? `In stock: ${stockQty}` : "Out of stock";
+          $("categoryLine").textContent = `Category: ${p.category_name} · Brand: ${p.brand}`;
+          $("description").textContent = p.description || "";
+
+          // Images
+          let imgs = [];
+          if (Array.isArray(p.image_urls)) {
+            imgs = p.image_urls;
+          } else {
+            try { imgs = JSON.parse(p.image_urls || "[]"); } catch { imgs = []; }
+          }
+          const main = $("mainImage");
+          main.src = imgs[0] || "";
+          main.alt = p.name;
+          const thumbs = $("thumbs");
+          thumbs.innerHTML = "";
+          imgs.forEach((src, idx) => {
+            const im = document.createElement("img");
+            im.src = src;
+            im.alt = `thumb ${idx+1}`;
+            im.style.width = "100%";
+            im.style.height = "70px";
+            im.style.objectFit = "cover";
+            im.style.borderRadius = "10px";
+            im.style.cursor = "pointer";
+            im.style.border = idx === 0 ? "2px solid rgba(37,99,235,.6)" : "1px solid var(--border)";
+            im.onclick = () => {
+              main.src = src;
+              Array.from(thumbs.children).forEach((c) => (c.style.border = "1px solid var(--border)"));
+              im.style.border = "2px solid rgba(37,99,235,.6)";
+            };
+            thumbs.appendChild(im);
+          });
+
+          // Reviews
+          const ratingCount = p.rating_count || 0;
+          $("reviewsMeta").textContent = `${ratingCount} review(s)`;
+          const list = $("reviewsList");
+          const token = window.localStorage.getItem("token");
+          const decoded = token ? decodeToken(token) : null;
+          const ownerId = decoded ? decoded.userId : null;
+          list.innerHTML = "";
+          (p.reviews || []).forEach((r) => {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.style.padding = "12px";
+            card.innerHTML = `
+              <div class="row" style="justify-content:space-between;">
+                <div style="font-weight:900;">${r.user_name}</div>
+                <span class="badge">${Number(r.rating)}★</span>
+              </div>
+              <div class="muted" style="margin-top:6px;line-height:1.5;">${r.review_text}</div>
+              <div class="row" style="margin-top:10px;justify-content:flex-end;">
+                ${ownerId && Number(r.user_id) === Number(ownerId) ? `
+                  <button type="button" class="secondary" style="padding:8px 10px;border-radius:10px;" onclick="startEdit(${r.user_id}, '${escapeHtml(r.review_text)}', ${r.rating})">Edit</button>
+                  <button type="button" class="danger" style="padding:8px 10px;border-radius:10px;background:#fff;" onclick="deleteReview()">Delete</button>
+                ` : ""}
+              </div>
+            `;
+            card.dataset.reviewOwner = r.user_id;
+            list.appendChild(card);
+          });
+
+          // Add to cart policy
+          $("addToCartBtn").disabled = !inStock;
+          $("addToCartBtn").onclick = () => addToCart(p, ownerId);
+
+          // Keep delete handlers with global context
+          window.__reviewsOwner = ownerId;
+          window.__currentProductId = productId;
+        } catch (e) {
+          $("errorBox").style.display = "block";
+          $("errorBox").className = "error";
+          $("errorBox").textContent = e.message || "Failed to load product.";
+        }
+      }
+
+      function escapeHtml(s) {
+        return (s || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      async function addToCart(p, ownerId) {
+        const qty = Number($("qty").value);
+        const err = $("qtyErr");
+        err.style.display = "none";
+
+        if (!Number.isFinite(qty) || qty < 1) return setBox(err, "error", "Enter a valid quantity.");
+        if (qty > Number(p.stock_quantity || 0)) return setBox(err, "error", "Quantity exceeds stock.");
+
+        const token = window.localStorage.getItem("token");
+        if (!token) {
+          window.location.href = "./Login.html";
+          return;
+        }
+
+        try {
+          const res = await apiFetch(`/cart/items`, {
+            method: "POST",
+            body: JSON.stringify({ productId: Number(productId), quantity: qty }),
+            requireAuth: true,
+          });
+          const m = $("cartMsg");
+          setBox(m, "success", res.message || "Added to cart");
+          m.style.display = "block";
+          setTimeout(() => (window.location.href = "./Cart.html"), 600);
+        } catch (e) {
+          const m = $("cartMsg");
+          setBox(m, "error", e.message || "Add to cart failed");
+          m.style.display = "block";
+        }
+      }
+
+      function startEdit(userId, reviewText, rating) {
+        editing = true;
+        $("reviewModeLine").textContent = "Editing your review";
+        $("cancelEditBtn").style.display = "inline-block";
+        $("submitReviewBtn").textContent = "Save";
+        $("reviewText").value = reviewText;
+        $("rating").value = String(rating);
+        window.__editingProductOwnerId = userId;
+      }
+
+      function cancelEdit() {
+        editing = false;
+        $("reviewModeLine").textContent = "";
+        $("cancelEditBtn").style.display = "none";
+        $("submitReviewBtn").textContent = "Submit";
+        $("reviewText").value = "";
+        $("rating").value = "5";
+      }
+
+      async function deleteReview() {
+        const token = window.localStorage.getItem("token");
+        if (!token) return (window.location.href = "./Login.html");
+        try {
+          await apiFetch(`/reviews/${productId}`, {
+            method: "DELETE",
+            requireAuth: true,
+          });
+          $("reviewMsg").style.display = "block";
+          setBox($("reviewMsg"), "success", "Review deleted");
+          // reload
+          setTimeout(loadProduct, 400);
+        } catch (e) {
+          $("reviewMsg").style.display = "block";
+          setBox($("reviewMsg"), "error", e.message || "Delete failed");
+        }
+      }
+
+      document.getElementById("reviewForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const token = window.localStorage.getItem("token");
+        if (!token) return (window.location.href = "./Login.html");
+
+        const rating = Number($("rating").value);
+        const reviewText = $("reviewText").value.trim();
+        if (!reviewText) return setBox($("reviewMsg"), "error", "Review text is required.");
+
+        try {
+          $("reviewMsg").style.display = "block";
+          const method = editing ? "PATCH" : "POST";
+          await apiFetch(`/reviews/${productId}`, {
+            method,
+            requireAuth: true,
+            body: JSON.stringify({ rating, reviewText }),
+          });
+          setBox($("reviewMsg"), "success", editing ? "Review updated" : "Review submitted");
+          // Reset edit mode after saving
+          cancelEdit();
+          setTimeout(loadProduct, 400);
+        } catch (e2) {
+          setBox($("reviewMsg"), "error", e2.message || "Review submission failed");
+        }
+      });
+
+      loadProduct();
+    </script>
+  </body>
+</html>
+

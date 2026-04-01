@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Neo Gadgets - Admin Products</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand"><span>Neo Gadgets</span></div>
+        <div class="nav">
+          <a href="./Admin.html">Admin</a>
+          <a href="./Home.html">Home</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:18px;">
+      <div id="msgBox" class="card" style="display:none;"></div>
+
+      <div class="grid two" style="align-items:start;">
+        <div class="card">
+          <h1 style="margin:0 0 10px;font-size:18px;">Create product</h1>
+          <form id="createForm" class="form">
+            <div>
+              <label>Category</label>
+              <select id="c_categoryId" required></select>
+            </div>
+            <div>
+              <label>Name</label>
+              <input id="c_name" type="text" required />
+            </div>
+            <div>
+              <label>Brand</label>
+              <input id="c_brand" type="text" required />
+            </div>
+            <div>
+              <label>Description</label>
+              <textarea id="c_description" rows="3"></textarea>
+            </div>
+            <div class="row">
+              <div style="flex:1;">
+                <label>Price</label>
+                <input id="c_price" type="number" step="0.01" required />
+              </div>
+              <div style="flex:1;">
+                <label>Stock</label>
+                <input id="c_stockQuantity" type="number" step="1" required />
+              </div>
+            </div>
+            <div>
+              <label>Available</label>
+              <select id="c_isAvailable" required>
+                <option value="1">In stock/available</option>
+                <option value="0">Unavailable</option>
+              </select>
+            </div>
+            <div>
+              <label>Image URLs (comma separated)</label>
+              <input id="c_imageUrls" type="text" placeholder="/images/a.png,/images/b.png" />
+            </div>
+
+            <button type="submit">Create</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h1 style="margin:0 0 10px;font-size:18px;">Update product</h1>
+          <form id="updateForm" class="form">
+            <div>
+              <label>Product ID</label>
+              <input id="u_productId" type="number" step="1" required />
+            </div>
+            <div>
+              <label>Category</label>
+              <select id="u_categoryId" required></select>
+            </div>
+            <div>
+              <label>Name</label>
+              <input id="u_name" type="text" required />
+            </div>
+            <div>
+              <label>Brand</label>
+              <input id="u_brand" type="text" required />
+            </div>
+            <div>
+              <label>Description</label>
+              <textarea id="u_description" rows="3"></textarea>
+            </div>
+            <div class="row">
+              <div style="flex:1;">
+                <label>Price</label>
+                <input id="u_price" type="number" step="0.01" required />
+              </div>
+              <div style="flex:1;">
+                <label>Stock</label>
+                <input id="u_stockQuantity" type="number" step="1" required />
+              </div>
+            </div>
+            <div>
+              <label>Available</label>
+              <select id="u_isAvailable" required>
+                <option value="1">In stock/available</option>
+                <option value="0">Unavailable</option>
+              </select>
+            </div>
+            <div>
+              <label>Image URLs (comma separated)</label>
+              <input id="u_imageUrls" type="text" />
+            </div>
+
+            <button type="submit">Update</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h1 style="margin:0 0 10px;font-size:18px;">Delete product</h1>
+        <div class="row">
+          <input id="d_productId" type="number" step="1" placeholder="product_id" style="max-width:220px;" />
+          <button type="button" class="danger" onclick="deleteProduct()">Delete</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h1 style="margin:0 0 10px;font-size:18px;">Catalog preview</h1>
+        <div id="catalogGrid" class="grid products" style="margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/ui.js"></script>
+    <script>
+      function setMsg(text, kind) {
+        const el = $("msgBox");
+        el.style.display = text ? "block" : "none";
+        el.className = kind === "success" ? "success" : kind === "error" ? "error" : "card";
+        el.textContent = text || "";
+      }
+
+      function imagesFromInput(v) {
+        const s = (v || "").trim();
+        if (!s) return [];
+        return s.split(",").map((x) => x.trim()).filter(Boolean);
+      }
+
+      async function loadCategories() {
+        const res = await apiFetch(`/catalog/categories`, { method: "GET" });
+        const cats = res.categories || [];
+        for (const selId of ["c_categoryId", "u_categoryId"]) {
+          const sel = $(selId);
+          sel.innerHTML = "";
+          cats.forEach((c) => {
+            const opt = document.createElement("option");
+            opt.value = c.category_id;
+            opt.textContent = c.name;
+            sel.appendChild(opt);
+          });
+        }
+      }
+
+      async function loadCatalogPreview() {
+        const res = await apiFetch(`/catalog/products?sort=latest`, { method: "GET" });
+        const products = res.products || [];
+        const grid = $("catalogGrid");
+        grid.innerHTML = products
+          .map((p) => {
+            let imgs = [];
+            try { imgs = JSON.parse(p.image_urls || "[]"); } catch { imgs = []; }
+            return `
+              <div class="card product-card" style="padding:14px;">
+                <img class="img" src="${imgs[0] || ''}" alt="${p.name}" />
+                <h3 style="margin-top:6px;">${p.name}</h3>
+                <div class="muted" style="font-size:13px;margin-top:4px;">${p.brand} · stock ${p.stock_quantity}</div>
+                <div class="row" style="justify-content:space-between;margin-top:10px;">
+                  <div style="font-weight:900;">₹${Number(p.price).toFixed(2)}</div>
+                  <span class="badge">${p.product_id}</span>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      async function createProduct(e) {
+        e.preventDefault();
+        try {
+          const body = {
+            categoryId: Number($("c_categoryId").value),
+            name: $("c_name").value.trim(),
+            brand: $("c_brand").value.trim(),
+            description: $("c_description").value.trim(),
+            price: Number($("c_price").value),
+            stockQuantity: Number($("c_stockQuantity").value),
+            isAvailable: Number($("c_isAvailable").value),
+            imageUrls: imagesFromInput($("c_imageUrls").value),
+          };
+          setMsg("", "");
+          await apiFetch(`/admin/products`, {
+            method: "POST",
+            requireAuth: true,
+            body: JSON.stringify(body),
+          });
+          setMsg("Product created.", "success");
+          await loadCatalogPreview();
+        } catch (err) {
+          setMsg(err.message || "Create failed.", "error");
+        }
+      }
+
+      async function updateProduct(e) {
+        e.preventDefault();
+        try {
+          const productId = Number($("u_productId").value);
+          const body = {
+            categoryId: Number($("u_categoryId").value),
+            name: $("u_name").value.trim(),
+            brand: $("u_brand").value.trim(),
+            description: $("u_description").value.trim(),
+            price: Number($("u_price").value),
+            stockQuantity: Number($("u_stockQuantity").value),
+            isAvailable: Number($("u_isAvailable").value),
+            imageUrls: imagesFromInput($("u_imageUrls").value),
+          };
+          setMsg("", "");
+          await apiFetch(`/admin/products/${productId}`, {
+            method: "PUT",
+            requireAuth: true,
+            body: JSON.stringify(body),
+          });
+          setMsg("Product updated.", "success");
+          await loadCatalogPreview();
+        } catch (err) {
+          setMsg(err.message || "Update failed.", "error");
+        }
+      }
+
+      async function deleteProduct() {
+        const productId = Number($("d_productId").value);
+        if (!productId) return setMsg("Enter product_id to delete.", "error");
+        try {
+          await apiFetch(`/admin/products/${productId}`, { method: "DELETE", requireAuth: true });
+          setMsg("Product deleted.", "success");
+          await loadCatalogPreview();
+        } catch (err) {
+          setMsg(err.message || "Delete failed.", "error");
+        }
+      }
+
+      $("createForm").addEventListener("submit", createProduct);
+      $("updateForm").addEventListener("submit", updateProduct);
+
+      loadCategories()
+        .then(loadCatalogPreview)
+        .catch(() => setMsg("Admin access required or catalog failed to load.", "error"));
+    </script>
+  </body>
+</html>
+

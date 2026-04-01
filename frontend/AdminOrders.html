@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Neo Gadgets - Admin Orders</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand"><span>Neo Gadgets</span></div>
+        <div class="nav">
+          <a href="./Admin.html">Admin</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:18px;">
+      <div id="msgBox" class="card" style="display:none;"></div>
+      <h1 style="margin:0 0 10px;font-size:22px;">Manage Orders</h1>
+
+      <div class="card">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>User</th>
+              <th>Status</th>
+              <th>Payment</th>
+              <th>Total</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/ui.js"></script>
+    <script>
+      function setMsg(text, kind) {
+        const el = $("msgBox");
+        el.style.display = text ? "block" : "none";
+        el.className = kind === "success" ? "success" : kind === "error" ? "error" : "card";
+        el.textContent = text || "";
+      }
+      function money(n) { return `₹${Number(n).toFixed(2)}`; }
+
+      async function loadOrders() {
+        try {
+          const res = await apiFetch(`/admin/orders`, { method: "GET", requireAuth: true });
+          const rows = res.orders || [];
+          const tbody = $("ordersTbody");
+          if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="muted">No orders.</td></tr>`;
+            return;
+          }
+          tbody.innerHTML = rows
+            .map((o) => {
+              const canCancel = o.order_status === "CREATED";
+              const canReturn = o.order_status === "DELIVERED";
+              const canMarkDelivered = o.order_status === "CREATED";
+              return `
+                <tr>
+                  <td>#${o.order_id}</td>
+                  <td>${o.user_email}</td>
+                  <td><span class="badge">${o.order_status}</span></td>
+                  <td class="muted">${o.payment_status}</td>
+                  <td style="font-weight:900;">${money(o.total)}</td>
+                  <td>
+                    <button type="button" style="padding:8px 10px;background:#fff;border:1px solid var(--border);border-radius:10px;display:${canCancel ? 'inline-block' : 'none'}" onclick="cancelOrder(${o.order_id})">Cancel</button>
+                    <button type="button" style="padding:8px 10px;background:#fff;border:1px solid var(--border);border-radius:10px;margin-left:8px;display:${canMarkDelivered ? 'inline-block' : 'none'}" onclick="markDelivered(${o.order_id})">Mark delivered</button>
+                    <button type="button" style="padding:8px 10px;background:#fff;border:1px solid rgba(220,38,38,.25);border-radius:10px;margin-left:8px;color:var(--danger);display:${canReturn ? 'inline-block' : 'none'}" onclick="returnOrder(${o.order_id})">Return</button>
+                  </td>
+                </tr>
+              `;
+            })
+            .join("");
+        } catch (e) {
+          setMsg(e.message || "Failed to load orders.", "error");
+        }
+      }
+
+      async function cancelOrder(orderId) {
+        try {
+          setMsg("", "");
+          await apiFetch(`/admin/orders/${orderId}/cancel`, { method: "POST", requireAuth: true });
+          setMsg("Order cancelled and refund simulated.", "success");
+          await loadOrders();
+        } catch (e) {
+          setMsg(e.message || "Cancel failed.", "error");
+        }
+      }
+
+      async function markDelivered(orderId) {
+        try {
+          setMsg("", "");
+          await apiFetch(`/admin/orders/${orderId}/mark-delivered`, { method: "POST", requireAuth: true });
+          setMsg("Order marked as delivered.", "success");
+          await loadOrders();
+        } catch (e) {
+          setMsg(e.message || "Mark delivered failed.", "error");
+        }
+      }
+
+      async function returnOrder(orderId) {
+        try {
+          setMsg("", "");
+          await apiFetch(`/admin/orders/${orderId}/return`, { method: "POST", requireAuth: true });
+          setMsg("Return processed and refund simulated.", "success");
+          await loadOrders();
+        } catch (e) {
+          setMsg(e.message || "Return failed.", "error");
+        }
+      }
+
+      loadOrders();
+    </script>
+  </body>
+</html>
+

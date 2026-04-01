@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Neo Gadgets - Admin Users</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand"><span>Neo Gadgets</span></div>
+        <div class="nav">
+          <a href="./Admin.html">Admin</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:18px;">
+      <div id="msgBox" class="card" style="display:none;"></div>
+      <h1 style="margin:0 0 10px;font-size:22px;">Manage Users</h1>
+
+      <div class="card">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Active</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="usersTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/ui.js"></script>
+    <script>
+      function setMsg(text, kind) {
+        const el = $("msgBox");
+        el.style.display = text ? "block" : "none";
+        el.className = kind === "success" ? "success" : kind === "error" ? "error" : "card";
+        el.textContent = text || "";
+      }
+
+      async function loadUsers() {
+        try {
+          const res = await apiFetch(`/admin/users`, { method: "GET", requireAuth: true });
+          const users = res.users || [];
+          const tbody = $("usersTbody");
+          tbody.innerHTML = users
+            .map((u) => {
+              const isActive = Number(u.is_active) === 1;
+              return `
+                <tr>
+                  <td>#${u.user_id}</td>
+                  <td>${u.name}</td>
+                  <td>${u.email}</td>
+                  <td class="muted">${u.role}</td>
+                  <td><span class="badge">${isActive ? "ACTIVE" : "INACTIVE"}</span></td>
+                  <td>
+                    <button type="button" style="padding:8px 10px;background:#fff;border:1px solid var(--border);border-radius:10px;" onclick="toggleActive(${u.user_id}, ${isActive ? 0 : 1})">
+                      ${isActive ? "Disable" : "Enable"}
+                    </button>
+                  </td>
+                </tr>
+              `;
+            })
+            .join("");
+        } catch (e) {
+          setMsg(e.message || "Failed to load users.", "error");
+        }
+      }
+
+      async function toggleActive(userId, isActive) {
+        try {
+          setMsg("", "");
+          await apiFetch(`/admin/users/${userId}`, {
+            method: "PATCH",
+            requireAuth: true,
+            body: JSON.stringify({ isActive }),
+          });
+          setMsg("User updated.", "success");
+          await loadUsers();
+        } catch (e) {
+          setMsg(e.message || "Update failed.", "error");
+        }
+      }
+
+      loadUsers();
+    </script>
+  </body>
+</html>
+

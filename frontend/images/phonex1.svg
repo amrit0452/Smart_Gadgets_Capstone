@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+  <rect width="800" height="600" fill="#ecfccb"/>
+  <rect x="110" y="70" width="580" height="460" rx="36" fill="#84cc16"/>
+  <text x="400" y="310" text-anchor="middle" font-family="Arial" font-size="44" fill="#0f172a">Pulse Phone X</text>
+</svg>
+

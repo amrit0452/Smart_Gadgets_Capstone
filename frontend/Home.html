@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Neo Gadgets - Home</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <span>Neo Gadgets</span>
+        </div>
+        <div class="nav">
+          <a href="./Home.html">Home</a>
+          <a href="./Cart.html">Cart <span id="cartCount" class="badge" style="display:none;">0</span></a>
+          <a href="./Orders.html">Orders</a>
+          <a href="./Admin.html">Admin</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <h1 style="margin:18px 0 8px;">Neo Gadgets</h1>
+      <p class="muted" style="margin-top:0;">Discover products, filter by price/brand/ratings, and checkout securely.</p>
+
+      <div class="grid two" style="align-items:start;">
+        <div class="card">
+          <h2 style="margin:0 0 10px;font-size:16px;">Filters</h2>
+          <form id="filterForm" class="form" style="grid-template-columns:1fr 1fr;">
+            <div style="grid-column:1/-1;">
+              <label>Search</label>
+              <input id="search" type="text" placeholder="Search products..." />
+            </div>
+            <div>
+              <label>Category</label>
+              <select id="category_id">
+                <option value="">All categories</option>
+              </select>
+            </div>
+            <div>
+              <label>Brand</label>
+              <select id="brand">
+                <option value="">All brands</option>
+              </select>
+            </div>
+
+            <div>
+              <label>Min Price</label>
+              <input id="minPrice" type="number" placeholder="0" step="0.01" />
+            </div>
+            <div>
+              <label>Max Price</label>
+              <input id="maxPrice" type="number" placeholder="1000" step="0.01" />
+            </div>
+
+            <div>
+              <label>Min Rating</label>
+              <input id="minRating" type="number" placeholder="0" step="0.1" />
+            </div>
+            <div>
+              <label>Availability</label>
+              <select id="availability">
+                <option value="">Any</option>
+                <option value="in_stock">In stock</option>
+              </select>
+            </div>
+
+            <div style="grid-column:1/-1;">
+              <label>Sort</label>
+              <select id="sort">
+                <option value="price_asc">Price: low to high</option>
+                <option value="price_desc">Price: high to low</option>
+                <option value="latest" selected>Latest</option>
+                <option value="popularity">Popularity</option>
+              </select>
+            </div>
+
+            <div style="grid-column:1/-1;" class="row">
+              <button type="submit">Apply</button>
+              <button type="button" class="secondary" onclick="resetFilters()">Reset</button>
+            </div>
+          </form>
+        </div>
+
+        <div>
+          <div class="row" style="justify-content:space-between;margin-bottom:10px;">
+            <div>
+              <strong id="resultMeta">Loading...</strong>
+            </div>
+          </div>
+          <div id="productsGrid" class="grid products"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/ui.js"></script>
+    <script>
+      function resetFilters() {
+        $("filterForm").reset();
+        loadCatalog();
+      }
+
+      function toQueryString(params) {
+        const entries = Object.entries(params).filter(([, v]) => v !== "" && v !== undefined && v !== null && !Number.isNaN(v));
+        const sp = new URLSearchParams();
+        for (const [k, v] of entries) sp.set(k, v);
+        return sp.toString();
+      }
+
+      async function loadCartCount() {
+        try {
+          const token = window.localStorage.getItem("token");
+          if (!token) return;
+          const res = await apiFetch(`/cart/summary`, { method: "GET", requireAuth: true });
+          const count = res.items.reduce((s, it) => s + Number(it.quantity), 0);
+          $("cartCount").style.display = "inline-flex";
+          $("cartCount").textContent = count;
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      async function loadCatalog() {
+        try {
+          const categoriesRes = await apiFetch(`/catalog/categories`);
+          const cats = categoriesRes.categories || [];
+          const catSel = $("category_id");
+          const prev = catSel.value;
+          catSel.innerHTML = '<option value="">All categories</option>';
+          cats.forEach((c) => {
+            const opt = document.createElement("option");
+            opt.value = c.category_id;
+            opt.textContent = c.name;
+            catSel.appendChild(opt);
+          });
+          if (prev) catSel.value = prev;
+        } catch (e) {
+          // ignore category load errors
+        }
+
+        // Brand options derive from seeded products (cheap approach).
+        try {
+          const allProducts = await apiFetch(`/catalog/products?sort=latest`);
+          const brands = Array.from(new Set((allProducts.products || []).map((p) => p.brand))).sort();
+          const brandSel = $("brand");
+          const currentBrand = brandSel.value;
+          brandSel.innerHTML = '<option value="">All brands</option>';
+          brands.forEach((b) => {
+            const opt = document.createElement("option");
+            opt.value = b;
+            opt.textContent = b;
+            brandSel.appendChild(opt);
+          });
+          if (currentBrand) brandSel.value = currentBrand;
+        } catch (e) {}
+
+        const form = $("filterForm");
+        const params = {
+          search: $("search").value.trim(),
+          category_id: $("category_id").value,
+          brand: $("brand").value,
+          minPrice: $("minPrice").value,
+          maxPrice: $("maxPrice").value,
+          minRating: $("minRating").value,
+          availability: $("availability").value,
+          sort: $("sort").value,
+        };
+
+        const query = toQueryString(params);
+        try {
+          $("productsGrid").innerHTML = "";
+          $("resultMeta").textContent = "Loading products...";
+          const res = await apiFetch(`/catalog/products?${query}`);
+          const products = res.products || [];
+          $("resultMeta").textContent = `${products.length} product(s)`;
+
+          if (!products.length) {
+            $("productsGrid").innerHTML = '<div class="card">No results found.</div>';
+            return;
+          }
+
+          $("productsGrid").innerHTML = products
+            .map((p) => {
+              const imgs = (() => {
+                if (Array.isArray(p.image_urls)) return p.image_urls;
+                try { return JSON.parse(p.image_urls || "[]"); } catch { return []; }
+              })();
+              const ratingAvg = Number(p.rating_avg || 0).toFixed(1);
+              const ratingCount = p.rating_count || 0;
+              const stockLabel = p.is_available && Number(p.stock_quantity) > 0 ? `In stock (${p.stock_quantity})` : "Out of stock";
+              return `
+                <div class="card product-card" style="padding:14px;">
+                  <img class="img" src="${imgs[0] || ''}" alt="${p.name}" />
+                  <h3>${p.name}</h3>
+                  <div class="row" style="justify-content:space-between;">
+                    <div class="price">₹${Number(p.price).toFixed(2)}</div>
+                    <span class="badge">${ratingAvg}★</span>
+                  </div>
+                  <div class="muted" style="font-size:13px;">${p.brand} · ${stockLabel}</div>
+                  <div class="row" style="margin-top:8px;justify-content:space-between;">
+                    <a class="secondary" href="./Product.html?id=${p.product_id}" style="background:#fff;border:1px solid var(--border);padding:10px 14px;border-radius:10px;">View</a>
+                    <a class="secondary" href="./Cart.html" style="background:#fff;border:1px solid var(--border);padding:10px 14px;border-radius:10px;">Cart</a>
+                  </div>
+                </div>
+              `;
+            })
+            .join("");
+        } catch (e) {
+          $("resultMeta").textContent = "Failed to load catalog.";
+          $("productsGrid").innerHTML = '<div class="error">Catalog load failed.</div>';
+        }
+      }
+
+      document.getElementById("filterForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        loadCatalog();
+      });
+
+      loadCartCount();
+      loadCatalog();
+    </script>
+  </body>
+</html>
+

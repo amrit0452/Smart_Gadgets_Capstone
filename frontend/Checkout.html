@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Neo Gadgets - Checkout</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand"><span>Neo Gadgets</span></div>
+        <div class="nav">
+          <a href="./Home.html">Home</a>
+          <a href="./Cart.html">Cart</a>
+          <a href="./Orders.html">Orders</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:18px;">
+      <div id="msgBox" class="card" style="display:none;"></div>
+      <div class="grid two" style="align-items:start;">
+        <div class="card">
+          <h1 style="margin:0 0 12px;font-size:22px;">Address</h1>
+          <form id="addressForm" class="form">
+            <div>
+              <label>Address Line 1</label>
+              <input id="line1" type="text" required maxlength="120" />
+            </div>
+            <div>
+              <label>City</label>
+              <input id="city" type="text" required maxlength="60" />
+            </div>
+            <div>
+              <label>State</label>
+              <input id="state" type="text" required maxlength="60" />
+            </div>
+            <div>
+              <label>ZIP</label>
+              <input id="zip" type="text" required maxlength="12" />
+            </div>
+            <div>
+              <label>Country</label>
+              <input id="country" type="text" required maxlength="60" />
+            </div>
+          </form>
+
+          <div style="margin-top:14px;" class="muted">
+            Checkout requires login and will validate payment + stock on the server.
+          </div>
+        </div>
+
+        <div class="card">
+          <h1 style="margin:0 0 12px;font-size:22px;">Order Review & Payment</h1>
+
+          <div id="reviewBox" class="card" style="padding:12px;background:#fff;border:1px solid var(--border);border-radius:12px;">
+            <div id="reviewItems" style="display:grid;gap:10px;"></div>
+            <div class="row" style="justify-content:space-between;margin-top:12px;">
+              <div class="muted" style="font-weight:800;">Subtotal</div>
+              <div id="subtotal" style="font-weight:900;">₹0.00</div>
+            </div>
+          </div>
+
+          <div style="margin-top:14px;">
+            <label>Payment Method</label>
+            <select id="paymentMethod" style="margin-top:6px;">
+              <option value="CREDIT">Credit Card</option>
+              <option value="DEBIT">Debit Card</option>
+              <option value="UPI">UPI</option>
+            </select>
+          </div>
+
+          <div id="paymentCardFields" style="margin-top:12px;">
+            <div>
+              <label>Card Number</label>
+              <input id="cardNumber" type="text" placeholder="4111111111111111" />
+            </div>
+            <div class="row" style="gap:12px;margin-top:10px;">
+              <div style="flex:1;">
+                <label>Expiry (MM/YYYY)</label>
+                <input id="expiry" type="text" placeholder="12/2099" />
+              </div>
+              <div style="width:140px;">
+                <label>CVV</label>
+                <input id="cvv" type="text" placeholder="123" />
+              </div>
+            </div>
+          </div>
+
+          <div id="paymentUPIFields" style="margin-top:12px;display:none;">
+            <div>
+              <label>UPI ID (e.g., name@upi)</label>
+              <input id="upiId" type="text" placeholder="amrit@upi" />
+            </div>
+          </div>
+
+          <div style="margin-top:14px;">
+            <button id="placeOrderBtn" type="button">Place order</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/ui.js"></script>
+    <script>
+      function setMsg(text, kind) {
+        const el = $("msgBox");
+        el.style.display = text ? "block" : "none";
+        el.className = kind === "success" ? "success" : kind === "error" ? "error" : "card";
+        el.textContent = text || "";
+      }
+
+      function money(n) {
+        return `₹${Number(n).toFixed(2)}`;
+      }
+
+      function validUPI(upi) {
+        return /^.+@(ybl|upi|oksbi|okhdfc)$/i.test(upi.trim());
+      }
+
+      function validExpiry(exp) {
+        return /^(0[1-9]|1[0-2])\s*\/\s*(20\d{2})$/.test(exp.trim());
+      }
+
+      function validCardNum(num) {
+        return /^\d{12,19}$/.test(num.replace(/\s/g, ""));
+      }
+
+      function togglePaymentFields() {
+        const m = $("paymentMethod").value;
+        $("paymentCardFields").style.display = m === "UPI" ? "none" : "block";
+        $("paymentUPIFields").style.display = m === "UPI" ? "block" : "none";
+      }
+
+      let cartItems = [];
+
+      async function loadReview() {
+        const token = window.localStorage.getItem("token");
+        if (!token) {
+          window.location.href = "./Login.html";
+          return;
+        }
+        setMsg("", "");
+        try {
+          const res = await apiFetch(`/cart/summary`, { method: "GET", requireAuth: true });
+          cartItems = res.items || [];
+          $("reviewItems").innerHTML = cartItems
+            .map((it) => `<div class="row" style="justify-content:space-between;">
+              <div><strong>${it.name}</strong><div class="muted" style="font-size:13px;">Qty ${it.quantity}</div></div>
+              <div>${money(it.lineTotal)}</div>
+            </div>`)
+            .join("");
+          $("subtotal").textContent = money(res.subtotal);
+        } catch (e) {
+          setMsg(e.message || "Failed to load checkout review.", "error");
+        }
+      }
+
+      $("paymentMethod").addEventListener("change", togglePaymentFields);
+      togglePaymentFields();
+
+      $("placeOrderBtn").onclick = async () => {
+        try {
+          const address = {
+            line1: $("line1").value.trim(),
+            city: $("city").value.trim(),
+            state: $("state").value.trim(),
+            zip: $("zip").value.trim(),
+            country: $("country").value.trim(),
+          };
+
+          if (!address.line1 || !address.city || !address.state || !address.zip || !address.country) {
+            setMsg("Address fields are required.", "error");
+            return;
+          }
+
+          const method = $("paymentMethod").value;
+          let body = { ...address, paymentMethod: method };
+
+          if (method === "UPI") {
+            const upiId = $("upiId").value.trim();
+            if (!validUPI(upiId)) return setMsg("Invalid UPI ID/provider. Allowed: @ybl, @upi, @oksbi, @okhdfc", "error");
+            body.upiId = upiId;
+          } else {
+            const cardNumber = $("cardNumber").value.trim();
+            const expiry = $("expiry").value.trim();
+            const cvv = $("cvv").value.trim();
+            if (!validCardNum(cardNumber)) return setMsg("Invalid card number format.", "error");
+            if (!validExpiry(expiry)) return setMsg("Invalid expiry format. Use MM/YYYY.", "error");
+            if (!/^\d{3,4}$/.test(cvv)) return setMsg("Invalid CVV.", "error");
+            body.cardNumber = cardNumber;
+            body.expiry = expiry;
+            body.cvv = cvv;
+          }
+
+          setMsg("", "");
+          await apiFetch(`/checkout/place`, {
+            method: "POST",
+            requireAuth: true,
+            body: JSON.stringify(body),
+          });
+
+          setMsg("Payment successful. Order placed!", "success");
+          setTimeout(() => (window.location.href = "./Orders.html"), 800);
+        } catch (e) {
+          setMsg(e.message || "Checkout failed.", "error");
+        }
+      };
+
+      loadReview();
+    </script>
+  </body>
+</html>
+

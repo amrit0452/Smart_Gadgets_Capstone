@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Neo Gadgets - Register</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <span>Neo Gadgets</span>
+        </div>
+        <div class="nav">
+          <a href="./Login.html">Login</a>
+          <a href="./Home.html">Home</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <h1 style="margin:0 0 10px;">Create account</h1>
+      <p class="muted" style="margin-top:0;">Sign up to add products to cart and place orders.</p>
+
+      <div class="card" style="max-width:560px;">
+        <form id="registerForm" class="form">
+          <div>
+            <label>Name</label>
+            <input id="name" type="text" placeholder="Your name" required minlength="1" maxlength="60" />
+          </div>
+          <div>
+            <label>Email</label>
+            <input id="email" type="email" placeholder="you@example.com" required />
+          </div>
+          <div>
+            <label>Password</label>
+            <input id="password" type="password" placeholder="Min 8 chars, upper/lower + number" required minlength="8" />
+          </div>
+
+          <div id="msg" style="display:none;"></div>
+
+          <button type="submit">Register</button>
+
+          <div class="row" style="justify-content:space-between;margin-top:6px;">
+            <a class="muted" href="./Login.html">Already have an account?</a>
+            <span class="muted">No spam. Ever.</span>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/ui.js"></script>
+    <script>
+      function setErr(text) {
+        setMessage($("msg"), "error", text);
+      }
+      function setOk(text) {
+        setMessage($("msg"), "success", text);
+      }
+
+      function passwordPolicy(pw) {
+        // Matches backend regex.
+        return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(pw);
+      }
+
+      const form = document.getElementById("registerForm");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = $("name").value.trim();
+        const email = $("email").value.trim();
+        const password = $("password").value;
+
+        if (!name) return setErr("Name is required.");
+        if (!email) return setErr("Email is required.");
+        if (!passwordPolicy(password)) return setErr("Password must include upper/lowercase and a number (min 8).");
+
+        try {
+          setMessage($("msg"), "", "");
+          const res = await apiFetch(`/auth/register`, {
+            method: "POST",
+            body: JSON.stringify({ name, email, password }),
+          });
+          setOk(res.message || "Registered successfully.");
+          window.location.href = "./Login.html";
+        } catch (err) {
+          setErr(err.message || "Registration failed.");
+        }
+      });
+    </script>
+  </body>
+</html>
+

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+  <rect width="800" height="600" fill="#fefce8"/>
+  <rect x="150" y="90" width="500" height="420" rx="30" fill="#f59e0b"/>
+  <text x="400" y="315" text-anchor="middle" font-family="Arial" font-size="44" fill="#0f172a">USB-C Cable (Alt)</text>
+</svg>
+

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Neo Gadgets - Admin Revenue</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="brand"><span>Neo Gadgets</span></div>
+        <div class="nav">
+          <a href="./Admin.html">Admin</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:18px;">
+      <div id="msgBox" class="card" style="display:none;"></div>
+      <h1 style="margin:0 0 10px;font-size:22px;">Revenue Report</h1>
+
+      <div class="card">
+        <form id="filterForm" class="form" style="grid-template-columns:1fr 1fr;max-width:520px;">
+          <div>
+            <label>From Date (YYYY-MM-DD)</label>
+            <input id="fromDate" type="date" />
+          </div>
+          <div>
+            <label>To Date (YYYY-MM-DD)</label>
+            <input id="toDate" type="date" />
+          </div>
+          <div style="grid-column:1/-1;" class="row">
+            <button type="submit">Load revenue</button>
+            <button type="button" class="secondary" onclick="clearFilters()" style="margin-left:10px;">Clear</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Revenue</th>
+            </tr>
+          </thead>
+          <tbody id="revenueTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script src="./js/config.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/ui.js"></script>
+    <script>
+      function setMsg(text, kind) {
+        const el = $("msgBox");
+        el.style.display = text ? "block" : "none";
+        el.className = kind === "success" ? "success" : kind === "error" ? "error" : "card";
+        el.textContent = text || "";
+      }
+      function money(n) { return `₹${Number(n).toFixed(2)}`; }
+
+      function clearFilters() {
+        $("fromDate").value = "";
+        $("toDate").value = "";
+      }
+
+      async function loadRevenue(fromDate, toDate) {
+        let query = [];
+        if (fromDate) query.push(`fromDate=${fromDate}`);
+        if (toDate) query.push(`toDate=${toDate}`);
+        const qs = query.length ? `?${query.join("&")}` : "";
+
+        try {
+          const res = await apiFetch(`/admin/revenue${qs}`, { method: "GET", requireAuth: true });
+          const rows = res.revenue || [];
+          const tbody = $("revenueTbody");
+          tbody.innerHTML = rows
+            .map((r) => `<tr><td>${r.day}</td><td style="font-weight:900;">${money(r.revenue)}</td></tr>`)
+            .join("");
+        } catch (e) {
+          setMsg(e.message || "Revenue load failed.", "error");
+        }
+      }
+
+      document.getElementById("filterForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const fromDate = $("fromDate").value;
+        const toDate = $("toDate").value;
+        setMsg("", "");
+        loadRevenue(fromDate || null, toDate || null);
+      });
+
+      loadRevenue(null, null);
+    </script>
+  </body>
+</html>
+

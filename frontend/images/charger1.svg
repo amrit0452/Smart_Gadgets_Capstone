@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+  <rect width="800" height="600" fill="#f0fdf4"/>
+  <rect x="120" y="80" width="560" height="440" rx="28" fill="#22c55e"/>
+  <text x="400" y="310" text-anchor="middle" font-family="Arial" font-size="48" fill="#0f172a">Orbit Charger 30W</text>
+</svg>
+
