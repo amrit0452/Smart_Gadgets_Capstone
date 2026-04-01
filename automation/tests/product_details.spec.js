@@ -88,15 +88,18 @@ test.describe("Product Details Page", () => {
   });
 
   test("product details page loads in browser", async ({ page }) => {
-    // Wait on the rendered heading — avoids waitForResponse flaking in CI (cache / instrumentation / fetch not seen as a response).
-    await page.goto("/Product.html?id=101", { waitUntil: "domcontentloaded" });
-    await expect(page.locator("#productTitle")).toContainText(/Nebula/i, { timeout: 30_000 });
+    // Use #productLayout h1 (not #productTitle) so tests pass whether the heading id is "title" or "productTitle".
+    // Full BASE_URL avoids relying on Playwright baseURL alone on CI.
+    const heading = page.locator("#productLayout h1");
+    await page.goto(`${BASE_URL}/Product.html?id=101`, { waitUntil: "load" });
+    await expect(heading).toContainText(/Nebula/i, { timeout: 30_000 });
   });
 
   test("qty boundary UI check remains on same page", async ({ page }) => {
-    await page.goto("/Product.html?id=106", { waitUntil: "domcontentloaded" });
+    const heading = page.locator("#productLayout h1");
+    await page.goto(`${BASE_URL}/Product.html?id=106`, { waitUntil: "load" });
     // Product 106 seed name: "Orbit Cable USB-C" — must load before addToCart wires validation.
-    await expect(page.locator("#productTitle")).toContainText(/Orbit|USB-C|Cable/i, { timeout: 30_000 });
+    await expect(heading).toContainText(/Orbit|USB-C|Cable/i, { timeout: 30_000 });
     await page.locator("#qty").fill("10000");
     await page.locator("#addToCartBtn").click();
     await expect(page.locator("#qtyErr")).toContainText(/Quantity exceeds stock/i);
