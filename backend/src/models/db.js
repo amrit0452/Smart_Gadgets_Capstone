@@ -8,7 +8,8 @@ function getPool() {
   if (pool) return pool;
 
   pool = mysql.createPool({
-    host: process.env.DB_HOST || "localhost",
+    // Use 127.0.0.1 so Node uses TCP; "localhost" can try a Unix socket and fail against Docker MySQL on Linux CI.
+    host: process.env.DB_HOST || "127.0.0.1",
     user: process.env.DB_USER || "root",
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME || "neo_gadgets",

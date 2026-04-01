@@ -41,6 +41,9 @@ jobs:
           node-version: "20"
           cache: "npm"
 
+      - name: Install MySQL client
+        run: sudo apt-get update -y && sudo apt-get install -y mysql-client
+
       - name: Wait for MySQL
         run: |
           for i in {1..40}; do
@@ -56,15 +59,21 @@ jobs:
 
       - name: Seed database
         run: |
+          set -e
           mysql -h 127.0.0.1 -uroot -proot neo_gadgets < database/schema.sql
           mysql -h 127.0.0.1 -uroot -proot neo_gadgets < database/seed.sql
+          mysql -h 127.0.0.1 -uroot -proot neo_gadgets -e \
+            "SELECT email, role FROM users WHERE email IN ('admin@example.com','user1@example.com');" \
+            | tee /dev/stderr | grep -q admin@example.com
 
+      # Must match services.mysql MYSQL_ROOT_PASSWORD and the E2E step env below.
+      # Playwright webServer.env defaults DB_PASSWORD to amrit44 if unset — CI must override.
       - name: Create backend env file
         run: |
           cat > backend/.env <<'EOF'
           DB_HOST=127.0.0.1
           DB_USER=root
-          DB_PASSWORD=amrit44
+          DB_PASSWORD=root
           DB_NAME=neo_gadgets
           JWT_SECRET=github_actions_secret
           JWT_EXPIRES_IN=1h
@@ -72,8 +81,12 @@ jobs:
           CORS_ORIGIN=*
           EOF
 
-      - name: Install dependencies
+      - name: Install dependencies (root — Playwright)
         run: npm ci
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
@@ -81,6 +94,11 @@ jobs:
       - name: Run E2E tests (Chromium + Firefox + WebKit)
         env:
           CI: "true"
+          DB_HOST: "127.0.0.1"
+          DB_USER: "root"
+          DB_PASSWORD: "root"
+          DB_NAME: "neo_gadgets"
+          JWT_SECRET: "github_actions_secret"
         run: npm run test:e2e
 
       - name: Generate Allure report
@@ -95,7 +113,7 @@ jobs:
 
   deploy:
     needs: e2e-and-allure
-    if: always()
+    if: ${{ needs.e2e-and-allure.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages

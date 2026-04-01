@@ -26,9 +26,9 @@ const config = {
     timeout: 120_000,
     // Users should set DB/JWT secrets via env or .env before running.
     env: {
-      DB_HOST: process.env.DB_HOST || "localhost",
+      DB_HOST: process.env.DB_HOST || "127.0.0.1",
       DB_USER: process.env.DB_USER || "root",
-      DB_PASSWORD: process.env.DB_PASSWORD || "amrit44",
+      DB_PASSWORD: process.env.DB_PASSWORD || (process.env.CI ? "root" : "amrit44"),
       DB_NAME: process.env.DB_NAME || "neo_gadgets",
       JWT_SECRET: process.env.JWT_SECRET || "9x@A#kL!2mP$zQ8rT^uV1wXyZ",
       PORT: process.env.PORT || "3000",
