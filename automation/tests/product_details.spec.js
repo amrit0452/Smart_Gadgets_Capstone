@@ -88,12 +88,20 @@ test.describe("Product Details Page", () => {
   });
 
   test("product details page loads in browser", async ({ page }) => {
-    await page.goto(`${BASE_URL}/Product.html?id=101`);
-    await expect(page.locator("#title")).toContainText(/Nebula/i);
+    const apiOk = page.waitForResponse(
+      (r) => r.url().includes("/api/products/101") && r.status() === 200
+    );
+    await page.goto("/Product.html?id=101");
+    await apiOk;
+    await expect(page.locator("#productTitle")).toContainText(/Nebula/i);
   });
 
   test("qty boundary UI check remains on same page", async ({ page }) => {
-    await page.goto(`${BASE_URL}/Product.html?id=106`);
+    const apiOk = page.waitForResponse(
+      (r) => r.url().includes("/api/products/106") && r.status() === 200
+    );
+    await page.goto("/Product.html?id=106");
+    await apiOk;
     await page.locator("#qty").fill("10000");
     await page.locator("#addToCartBtn").click();
     await expect(page.locator("#qtyErr")).toContainText(/Quantity exceeds stock/i);

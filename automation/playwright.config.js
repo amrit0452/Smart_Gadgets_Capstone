@@ -8,7 +8,7 @@ const config = {
   timeout: 60_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: process.env.PW_BASE_URL || "http://127.0.0.1:3000",
     headless: true,
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -21,7 +21,7 @@ const config = {
   ],
   webServer: {
     command: "node ../backend/src/server.js",
-    url: "http://localhost:3000/health",
+    url: `${process.env.PW_BASE_URL || "http://127.0.0.1:3000"}/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     // Users should set DB/JWT secrets via env or .env before running.

@@ -1,6 +1,6 @@
 const { uniqueId } = require("./unique");
 
-const BASE_URL = process.env.PW_BASE_URL || "http://localhost:3000";
+const BASE_URL = process.env.PW_BASE_URL || "http://127.0.0.1:3000";
 
 function authHeaders(token) {
   return {
