@@ -1,0 +1,14 @@
+allure-results/
+allure-report/
+
+# Generated Playwright HTML report output folder
+automation/automation-report/
+
+# Node dependencies
+node_modules/
+backend/node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
