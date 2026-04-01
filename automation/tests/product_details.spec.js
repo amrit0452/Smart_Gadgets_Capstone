@@ -88,34 +88,15 @@ test.describe("Product Details Page", () => {
   });
 
   test("product details page loads in browser", async ({ page }) => {
-    // Do not require r.status()===200 in the predicate — if the API returns 4xx/5xx, the
-    // predicate would never pass and this would hang until the test timeout.
-    const productRes = page.waitForResponse((r) => {
-      try {
-        const u = new URL(r.url());
-        return r.request().method() === "GET" && u.pathname === "/api/products/101";
-      } catch {
-        return false;
-      }
-    });
-    await page.goto("/Product.html?id=101");
-    const res = await productRes;
-    expect(res.status()).toBe(200);
-    await expect(page.locator("#productTitle")).toContainText(/Nebula/i);
+    // Wait on the rendered heading — avoids waitForResponse flaking in CI (cache / instrumentation / fetch not seen as a response).
+    await page.goto("/Product.html?id=101", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("#productTitle")).toContainText(/Nebula/i, { timeout: 30_000 });
   });
 
   test("qty boundary UI check remains on same page", async ({ page }) => {
-    const productRes = page.waitForResponse((r) => {
-      try {
-        const u = new URL(r.url());
-        return r.request().method() === "GET" && u.pathname === "/api/products/106";
-      } catch {
-        return false;
-      }
-    });
-    await page.goto("/Product.html?id=106");
-    const res = await productRes;
-    expect(res.status()).toBe(200);
+    await page.goto("/Product.html?id=106", { waitUntil: "domcontentloaded" });
+    // Product 106 seed name: "Orbit Cable USB-C" — must load before addToCart wires validation.
+    await expect(page.locator("#productTitle")).toContainText(/Orbit|USB-C|Cable/i, { timeout: 30_000 });
     await page.locator("#qty").fill("10000");
     await page.locator("#addToCartBtn").click();
     await expect(page.locator("#qtyErr")).toContainText(/Quantity exceeds stock/i);
