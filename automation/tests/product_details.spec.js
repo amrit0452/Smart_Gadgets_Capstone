@@ -88,20 +88,34 @@ test.describe("Product Details Page", () => {
   });
 
   test("product details page loads in browser", async ({ page }) => {
-    const apiOk = page.waitForResponse(
-      (r) => r.url().includes("/api/products/101") && r.status() === 200
-    );
+    // Do not require r.status()===200 in the predicate — if the API returns 4xx/5xx, the
+    // predicate would never pass and this would hang until the test timeout.
+    const productRes = page.waitForResponse((r) => {
+      try {
+        const u = new URL(r.url());
+        return r.request().method() === "GET" && u.pathname === "/api/products/101";
+      } catch {
+        return false;
+      }
+    });
     await page.goto("/Product.html?id=101");
-    await apiOk;
+    const res = await productRes;
+    expect(res.status()).toBe(200);
     await expect(page.locator("#productTitle")).toContainText(/Nebula/i);
   });
 
   test("qty boundary UI check remains on same page", async ({ page }) => {
-    const apiOk = page.waitForResponse(
-      (r) => r.url().includes("/api/products/106") && r.status() === 200
-    );
+    const productRes = page.waitForResponse((r) => {
+      try {
+        const u = new URL(r.url());
+        return r.request().method() === "GET" && u.pathname === "/api/products/106";
+      } catch {
+        return false;
+      }
+    });
     await page.goto("/Product.html?id=106");
-    await apiOk;
+    const res = await productRes;
+    expect(res.status()).toBe(200);
     await page.locator("#qty").fill("10000");
     await page.locator("#addToCartBtn").click();
     await expect(page.locator("#qtyErr")).toContainText(/Quantity exceeds stock/i);
