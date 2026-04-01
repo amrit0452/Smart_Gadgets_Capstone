@@ -1,0 +1,109 @@
+name: E2E Tests With Allure
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  e2e-and-allure:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: neo_gadgets
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..40}; do
+            if mysqladmin ping -h 127.0.0.1 -uroot -proot --silent; then
+              echo "MySQL is ready"
+              exit 0
+            fi
+            echo "Waiting for MySQL..."
+            sleep 2
+          done
+          echo "MySQL failed to start"
+          exit 1
+
+      - name: Seed database
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot neo_gadgets < database/schema.sql
+          mysql -h 127.0.0.1 -uroot -proot neo_gadgets < database/seed.sql
+
+      - name: Create backend env file
+        run: |
+          cat > backend/.env <<'EOF'
+          DB_HOST=127.0.0.1
+          DB_USER=root
+          DB_PASSWORD=amrit44
+          DB_NAME=neo_gadgets
+          JWT_SECRET=github_actions_secret
+          JWT_EXPIRES_IN=1h
+          PORT=3000
+          CORS_ORIGIN=*
+          EOF
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run E2E tests (Chromium + Firefox + WebKit)
+        env:
+          CI: "true"
+        run: npm run test:e2e
+
+      - name: Generate Allure report
+        if: always()
+        run: npm run allure:generate
+
+      - name: Upload Allure report artifact for Pages
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: allure-report
+
+  deploy:
+    needs: e2e-and-allure
+    if: always()
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
